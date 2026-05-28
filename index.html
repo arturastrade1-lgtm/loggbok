@@ -70,7 +70,6 @@ input:focus{outline:none;border-color:#f5a623;}
     <span class="gps-label">REGISTRER POSISJON</span>
     <span class="gps-sub" id="gpsSub">GPS → vegnr, SD, meter, tid</span>
   </button>
-
   <div id="resultBox" class="result-box" style="display:none">
     <div class="result-title">✓ HENTET FRA NVDB</div>
     <div class="result-grid">
@@ -80,7 +79,6 @@ input:focus{outline:none;border-color:#f5a623;}
       <div><div class="result-lbl">TID</div><div class="result-val" id="rv_tid">—</div></div>
     </div>
   </div>
-
   <button id="stopBtn" onclick="registerStop()">⏹ &nbsp;REGISTRER STOPPTID</button>
   <div class="divider">JUSTER / LEGG TIL DETALJER</div>
   <div class="form-grid">
@@ -126,6 +124,41 @@ function showTab(t){
   document.getElementById('btnReg').className='tab'+(t==='reg'?' active':'');
   document.getElementById('btnLog').className='tab'+(t==='log'?' active':'');
 }
+
+function parseKortform(kortform){
+  const parts=kortform.trim().split(/\s+/);
+  const vegnr=parts[0]||'';
+  const sd=parts.find(p=>/^S\d/i.test(p))||'';
+  const mPart=parts.find(p=>/^m\d/i.test(p))||'';
+  const meter=mPart.replace(/^m/i,'');
+  return{vegnr,sd,meter,kortform};
+}
+
+async function nvdbLookup(lat,lon){
+  const nvdbUrls=[
+    `https://nvdbapiv3.atlas.vegvesen.no/veg?lat=${lat}&lon=${lon}&maks_avstand=100`,
+    `https://nvdbapiv3.atlas.vegvesen.no/posisjon?lat=${lat}&lon=${lon}&maks_avstand=100`,
+  ];
+  // 1. Try direct browser fetch (works if NVDB has CORS headers)
+  for(const url of nvdbUrls){
+    try{
+      const res=await fetch(url,{headers:{Accept:'application/json','X-Client':'loggbok'}});
+      if(!res.ok) continue;
+      const data=await res.json();
+      const item=Array.isArray(data)?data[0]:data;
+      const kortform=item?.vegsystemreferanse?.kortform;
+      if(kortform) return parseKortform(kortform);
+    }catch(e){console.log('Direct NVDB failed:',e.message);}
+  }
+  // 2. Fallback to Vercel proxy
+  try{
+    const res=await fetch(`/api/nvdb?lat=${lat}&lon=${lon}`);
+    const data=await res.json();
+    if(data.vegnr) return data;
+  }catch(e){console.log('Proxy failed:',e.message);}
+  return null;
+}
+
 async function registerGPS(){
   if(!navigator.geolocation){showStatus('GPS ikke tilgjengelig.','err');return;}
   const btn=document.getElementById('gpsBtn');
@@ -139,29 +172,28 @@ async function registerGPS(){
     const acc=`±${Math.round(accuracy)}m`;
     document.getElementById('gpsSub').textContent=`${lat.toFixed(5)}, ${lon.toFixed(5)}  ${acc}`;
     try{
-      const res=await fetch(`/api/nvdb?lat=${lat}&lon=${lon}`);
-      const data=await res.json();
-      if(data.vegnr){
-        document.getElementById('f_vegnr').value=data.vegnr;
-        document.getElementById('f_sd').value=data.sd;
-        document.getElementById('f_meter').value=data.meter;
+      const road=await nvdbLookup(lat,lon);
+      if(road?.vegnr){
+        document.getElementById('f_vegnr').value=road.vegnr;
+        document.getElementById('f_sd').value=road.sd;
+        document.getElementById('f_meter').value=road.meter;
         document.getElementById('f_startDato').value=t.dato;
         document.getElementById('f_startKl').value=t.kl;
-        document.getElementById('rv_vegnr').textContent=data.vegnr;
-        document.getElementById('rv_sd').textContent=data.sd||'—';
-        document.getElementById('rv_meter').textContent=data.meter?'m'+data.meter:'—';
+        document.getElementById('rv_vegnr').textContent=road.vegnr;
+        document.getElementById('rv_sd').textContent=road.sd||'—';
+        document.getElementById('rv_meter').textContent=road.meter?'m'+road.meter:'—';
         document.getElementById('rv_tid').textContent=t.kl;
         document.getElementById('resultBox').style.display='block';
-        showStatus(`✓ ${data.kortform} — ${t.dato} kl.${t.kl}  (${acc})`);
+        showStatus(`✓ ${road.kortform} — ${t.dato} kl.${t.kl}  (${acc})`);
       }else{
         document.getElementById('f_startDato').value=t.dato;
         document.getElementById('f_startKl').value=t.kl;
-        showStatus(`GPS OK (${acc}). Veg ikke funnet. Tid satt.`,'warn');
+        showStatus(`GPS OK (${acc}). Veg ikke funnet. Tid satt. Fyll inn vegnr manuelt.`,'warn');
       }
     }catch(e){
       document.getElementById('f_startDato').value=t.dato;
       document.getElementById('f_startKl').value=t.kl;
-      showStatus(`GPS OK (${acc}). Tid satt. Fyll inn vegnr manuelt.`,'warn');
+      showStatus(`GPS OK (${acc}). Tid satt.`,'warn');
     }finally{
       btn.classList.remove('pulsing');
       btn.querySelector('.gps-label').textContent='REGISTRER POSISJON';
