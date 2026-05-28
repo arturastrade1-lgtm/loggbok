@@ -5,8 +5,10 @@ export default async function handler(req, res) {
   const headers = {
     'Accept': 'application/json',
     'X-Client': 'loggbok-arbeidsvarsling',
-    'User-Agent': 'loggbok-arbeidsvarsling/1.0'
+    'User-Agent': 'Mozilla/5.0 (compatible; loggbok/1.0)'
   };
+
+  const results = [];
 
   const urls = [
     `https://nvdbapiv3.atlas.vegvesen.no/veg?lat=${lat}&lon=${lon}&maks_avstand=100`,
@@ -16,13 +18,15 @@ export default async function handler(req, res) {
   for (const url of urls) {
     try {
       const response = await fetch(url, { headers });
+      const text = await response.text();
+      results.push({ url, status: response.status, body: text.slice(0, 500) });
+
       if (!response.ok) continue;
-      const data = await response.json();
+      const data = JSON.parse(text);
       const item = Array.isArray(data) ? data[0] : data;
       const kortform = item?.vegsystemreferanse?.kortform;
       if (!kortform) continue;
 
-      // Parse by pattern — handles "KV1336 S1D1 m52" AND "FV115 K S7D1 m1122"
       const parts = kortform.trim().split(/\s+/);
       const vegnr  = parts[0] || '';
       const sd     = parts.find(p => /^S\d/i.test(p)) || '';
@@ -30,8 +34,10 @@ export default async function handler(req, res) {
       const meter  = mPart.replace(/^m/i, '');
 
       return res.status(200).json({ vegnr, sd, meter, kortform });
-    } catch (e) { continue; }
+    } catch (e) {
+      results.push({ url, error: e.message });
+    }
   }
 
-  return res.status(200).json({ error: 'not_found' });
+  return res.status(200).json({ error: 'not_found', debug: results });
 }
