@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Loggbok – Arbeidsvarsling</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Barlow+Condensed:wght@700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0e0e0e;color:#ddd;font-family:'IBM Plex Mono',monospace;max-width:520px;margin:0 auto;min-height:100vh;}
+header{display:flex;justify-content:space-between;align-items:flex-end;padding:20px 20px 14px;border-bottom:2px solid #f5a623;}
+.eye{font-size:9px;letter-spacing:4px;color:#f5a623;font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:2px;}
+h1{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:40px;letter-spacing:3px;color:#fff;line-height:1;}
+#csvBtn{background:#f5a623;color:#111;border:none;padding:10px 16px;font-family:'IBM Plex Mono';font-weight:600;font-size:11px;cursor:pointer;letter-spacing:1px;}
+#statusBar{display:none;padding:11px 20px;font-size:12px;border-left:3px solid;line-height:1.6;}
+.tabs{display:flex;border-bottom:1px solid #1e1e1e;}
+.tab{flex:1;background:none;border:none;color:#555;padding:13px 4px;font-family:'IBM Plex Mono';font-size:10px;cursor:pointer;letter-spacing:1px;border-bottom:2px solid transparent;white-space:nowrap;}
+.tab.active{color:#f5a623;border-bottom:2px solid #f5a623;}
+.tab-badge{background:#f5a623;color:#111;border-radius:2px;padding:1px 5px;margin-left:3px;font-size:10px;font-weight:600;}
+.content{padding:16px;display:flex;flex-direction:column;gap:12px;}
+#gpsBtn{background:#1a1400;border:2px solid #f5a623;color:#fff;width:100%;padding:28px 20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;}
+#gpsBtn:active{transform:scale(.98);}
+#gpsBtn.pulsing{animation:gpsPulse 1.4s ease-in-out infinite;}
+.gps-icon{font-size:38px;}
+.gps-label{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:24px;letter-spacing:3px;color:#f5a623;}
+.gps-sub{font-size:10px;color:#8a7040;letter-spacing:1px;text-align:center;line-height:1.7;}
+.result-box{background:#0d2010;border:1px solid #2a5a2a;padding:14px 16px;}
+.result-title{font-size:9px;letter-spacing:2px;color:#5aaa5a;font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:10px;}
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.result-lbl{font-size:9px;color:#4a7a4a;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:1px;margin-bottom:2px;}
+.result-val{font-size:18px;color:#7ecf7e;font-family:'Barlow Condensed',sans-serif;font-weight:800;}
+#stopBtn{background:#141414;border:1px solid #2a2a2a;color:#888;padding:14px;font-family:'IBM Plex Mono';font-size:12px;cursor:pointer;letter-spacing:1px;width:100%;}
+.divider{font-size:9px;color:#333;letter-spacing:3px;font-family:'Barlow Condensed',sans-serif;font-weight:700;padding:2px 0;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.fw{grid-column:1/-1;}
+label{display:block;font-size:9px;letter-spacing:2px;color:#f5a623;font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:4px;}
+input{width:100%;background:#141414;border:1px solid #222;color:#ddd;padding:11px 10px;font-family:'IBM Plex Mono';font-size:14px;}
+input::placeholder{color:#3a3a3a;}
+input:focus{outline:none;border-color:#f5a623;}
+#addBtn{background:#f5a623;color:#111;border:none;padding:15px;font-family:'IBM Plex Mono';font-weight:600;font-size:14px;cursor:pointer;letter-spacing:1px;width:100%;}
+.empty-log{text-align:center;padding:50px 20px;color:#444;font-size:13px;display:flex;flex-direction:column;gap:14px;align-items:center;}
+.go-reg{background:none;border:1px solid #333;color:#666;padding:10px 20px;font-family:'IBM Plex Mono';font-size:12px;cursor:pointer;}
+.card{background:#141414;border:1px solid #1e1e1e;padding:14px 16px;margin-bottom:8px;}
+.card-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.card-veg{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:22px;color:#fff;flex:1;}
+.tag{background:#1e1e1e;color:#f5a623;font-size:10px;padding:2px 6px;margin-right:4px;}
+.del-btn{background:none;border:none;color:#333;font-size:16px;cursor:pointer;}
+.card-meta{font-size:11px;color:#666;margin-bottom:3px;}
+.card-note{font-size:12px;color:#999;}
+.card-navn{font-size:11px;color:#555;margin-top:2px;}
+#exportBig{background:#1a1400;border:2px solid #f5a623;color:#f5a623;padding:15px;font-family:'IBM Plex Mono';font-weight:600;font-size:13px;cursor:pointer;width:100%;margin-top:6px;display:none;}
+@keyframes gpsPulse{0%,100%{box-shadow:0 0 0 0 rgba(245,166,35,.4);}50%{box-shadow:0 0 0 20px rgba(245,166,35,0);}}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="eye">ARBEIDSVARSLING</div><h1>LOGGBOK</h1></div>
+  <button id="csvBtn" onclick="exportCSV()">↓ CSV</button>
+</header>
+<div id="statusBar"></div>
+<div class="tabs">
+  <button class="tab active" id="btnReg" onclick="showTab('reg')">REGISTRER</button>
+  <button class="tab" id="btnLog" onclick="showTab('log')">LOGG <span class="tab-badge" id="logCount" style="display:none">0</span></button>
+</div>
+
+<div class="content" id="tabReg">
+  <button id="gpsBtn" onclick="registerGPS()">
+    <span class="gps-icon">📍</span>
+    <span class="gps-label">REGISTRER POSISJON</span>
+    <span class="gps-sub" id="gpsSub">GPS → vegnr, SD, meter, tid</span>
+  </button>
+
+  <div id="resultBox" class="result-box" style="display:none">
+    <div class="result-title">✓ HENTET FRA NVDB</div>
+    <div class="result-grid">
+      <div><div class="result-lbl">VEGNR</div><div class="result-val" id="rv_vegnr">—</div></div>
+      <div><div class="result-lbl">SD</div><div class="result-val" id="rv_sd">—</div></div>
+      <div><div class="result-lbl">METER</div><div class="result-val" id="rv_meter">—</div></div>
+      <div><div class="result-lbl">TID</div><div class="result-val" id="rv_tid">—</div></div>
+    </div>
+  </div>
+
+  <button id="stopBtn" onclick="registerStop()">⏹ &nbsp;REGISTRER STOPPTID</button>
+  <div class="divider">JUSTER / LEGG TIL DETALJER</div>
+  <div class="form-grid">
+    <div><label>Vegnr</label><input id="f_vegnr" placeholder="FV115"></div>
+    <div><label>SD</label><input id="f_sd" placeholder="S7D1"></div>
+    <div><label>Meter</label><input id="f_meter" placeholder="1122"></div>
+    <div><label>Start dato</label><input id="f_startDato" placeholder="DD.MM.ÅÅÅÅ"></div>
+    <div><label>Start kl.</label><input id="f_startKl" placeholder="HH:MM"></div>
+    <div><label>Stopp dato</label><input id="f_stoppDato" placeholder="DD.MM.ÅÅÅÅ"></div>
+    <div><label>Stopp kl.</label><input id="f_stoppKl" placeholder="HH:MM"></div>
+    <div class="fw"><label>Navn / firma</label><input id="f_navn" placeholder="Arild Kolstad A/S"></div>
+    <div class="fw"><label>Utstyr / merknad</label><input id="f_merknad" placeholder="Arbeidsvarslingsskilt, sperrebukker…"></div>
+    <div><label>Signatur</label><input id="f_sign"></div>
+  </div>
+  <button id="addBtn" onclick="addRow()">+ LEGG TIL I LOGG</button>
+</div>
+
+<div class="content" id="tabLog" style="display:none">
+  <div class="empty-log" id="emptyLog">
+    <div style="font-size:40px">📋</div>
+    <div>Ingen registreringer ennå.</div>
+    <button class="go-reg" onclick="showTab('reg')">Gå til registrering →</button>
+  </div>
+  <div id="rowList"></div>
+  <button id="exportBig" onclick="exportCSV()">↓ Last ned CSV</button>
+</div>
+
+<script>
+const rows=[];
+const FIELDS=['vegnr','sd','meter','startDato','startKl','stoppDato','stoppKl','navn','merknad','sign'];
+const LABELS=['Vegnr','SD','Meter','Start dato','Start kl.','Stopp dato','Stopp kl.','Navn / firma','Utstyr / merknad','Signatur'];
+function pad(n){return String(n).padStart(2,'0');}
+function nowStr(){const d=new Date();return{dato:`${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}`,kl:`${pad(d.getHours())}:${pad(d.getMinutes())}`};}
+function showStatus(msg,type='ok'){
+  const bar=document.getElementById('statusBar');
+  const c={ok:['#0d2b0d','#3a7a3a','#7ecf7e'],err:['#2b0d0d','#7a3a3a','#cf7e7e'],warn:['#2b200d','#7a5e3a','#cfb07e'],info:['#0d1e2b','#3a607a','#7ebacf']}[type];
+  bar.style.cssText=`display:block;padding:11px 20px;font-size:12px;border-left:3px solid;line-height:1.6;background:${c[0]};border-color:${c[1]};color:${c[2]};`;
+  bar.textContent=msg;clearTimeout(bar._t);bar._t=setTimeout(()=>{bar.style.display='none';},7000);
+}
+function showTab(t){
+  document.getElementById('tabReg').style.display=t==='reg'?'flex':'none';
+  document.getElementById('tabLog').style.display=t==='log'?'flex':'none';
+  document.getElementById('btnReg').className='tab'+(t==='reg'?' active':'');
+  document.getElementById('btnLog').className='tab'+(t==='log'?' active':'');
+}
+async function registerGPS(){
+  if(!navigator.geolocation){showStatus('GPS ikke tilgjengelig.','err');return;}
+  const btn=document.getElementById('gpsBtn');
+  btn.classList.add('pulsing');
+  btn.querySelector('.gps-label').textContent='HENTER POSISJON…';
+  document.getElementById('gpsSub').textContent='GPS aktiv…';
+  showStatus('📡 Henter posisjon og vegdata…','info');
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const{latitude:lat,longitude:lon,accuracy}=pos.coords;
+    const t=nowStr();
+    const acc=`±${Math.round(accuracy)}m`;
+    document.getElementById('gpsSub').textContent=`${lat.toFixed(5)}, ${lon.toFixed(5)}  ${acc}`;
+    try{
+      const res=await fetch(`/api/nvdb?lat=${lat}&lon=${lon}`);
+      const data=await res.json();
+      if(data.vegnr){
+        document.getElementById('f_vegnr').value=data.vegnr;
+        document.getElementById('f_sd').value=data.sd;
+        document.getElementById('f_meter').value=data.meter;
+        document.getElementById('f_startDato').value=t.dato;
+        document.getElementById('f_startKl').value=t.kl;
+        document.getElementById('rv_vegnr').textContent=data.vegnr;
+        document.getElementById('rv_sd').textContent=data.sd||'—';
+        document.getElementById('rv_meter').textContent=data.meter?'m'+data.meter:'—';
+        document.getElementById('rv_tid').textContent=t.kl;
+        document.getElementById('resultBox').style.display='block';
+        showStatus(`✓ ${data.kortform} — ${t.dato} kl.${t.kl}  (${acc})`);
+      }else{
+        document.getElementById('f_startDato').value=t.dato;
+        document.getElementById('f_startKl').value=t.kl;
+        showStatus(`GPS OK (${acc}). Veg ikke funnet. Tid satt.`,'warn');
+      }
+    }catch(e){
+      document.getElementById('f_startDato').value=t.dato;
+      document.getElementById('f_startKl').value=t.kl;
+      showStatus(`GPS OK (${acc}). Tid satt. Fyll inn vegnr manuelt.`,'warn');
+    }finally{
+      btn.classList.remove('pulsing');
+      btn.querySelector('.gps-label').textContent='REGISTRER POSISJON';
+    }
+  },err=>{
+    btn.classList.remove('pulsing');
+    btn.querySelector('.gps-label').textContent='REGISTRER POSISJON';
+    document.getElementById('gpsSub').textContent='GPS → vegnr, SD, meter, tid';
+    if(err.code===1)showStatus('GPS nektet. Innstillinger → Safari → Posisjon → Spør.','err');
+    else showStatus('GPS utilgjengelig. Gå utendørs og prøv igjen.','err');
+  },{enableHighAccuracy:true,timeout:15000});
+}
+function registerStop(){
+  const t=nowStr();
+  document.getElementById('f_stoppDato').value=t.dato;
+  document.getElementById('f_stoppKl').value=t.kl;
+  showStatus(`⏹ Stopptid: ${t.dato} kl.${t.kl}`);
+}
+function getForm(){const o={};FIELDS.forEach(k=>{o[k]=document.getElementById('f_'+k)?.value||'';});return o;}
+function clearForm(){
+  FIELDS.forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';});
+  document.getElementById('gpsSub').textContent='GPS → vegnr, SD, meter, tid';
+  document.getElementById('resultBox').style.display='none';
+}
+function addRow(){
+  const f=getForm();
+  if(!FIELDS.some(k=>f[k])){showStatus('Registrer GPS eller fyll inn detaljer først.','err');return;}
+  rows.push({...f,id:Date.now()});
+  clearForm();updateLog();showTab('log');
+  showStatus('✓ Lagt til i loggen!');
+}
+function removeRow(id){const i=rows.findIndex(r=>r.id===id);if(i>=0)rows.splice(i,1);updateLog();}
+function updateLog(){
+  const n=rows.length;
+  const badge=document.getElementById('logCount');
+  badge.style.display=n>0?'inline':'none';badge.textContent=n;
+  document.getElementById('emptyLog').style.display=n===0?'flex':'none';
+  document.getElementById('exportBig').style.display=n>0?'block':'none';
+  document.getElementById('exportBig').textContent=`↓ Last ned CSV (${n} rad${n!==1?'er':''})`;
+  document.getElementById('rowList').innerHTML=rows.map(row=>`
+    <div class="card">
+      <div class="card-top">
+        <div class="card-veg">${row.vegnr||'—'}</div>
+        <div>${row.sd?`<span class="tag">${row.sd}</span>`:''}${row.meter?`<span class="tag">m${row.meter}</span>`:''}</div>
+        <button class="del-btn" onclick="removeRow(${row.id})">✕</button>
+      </div>
+      <div class="card-meta">${row.startDato?`▶ ${row.startDato} ${row.startKl}`:''}${row.stoppDato?` ■ ${row.stoppDato} ${row.stoppKl}`:''}</div>
+      ${row.merknad?`<div class="card-note">${row.merknad}</div>`:''}
+      ${row.navn?`<div class="card-navn">${row.navn}</div>`:''}
+    </div>`).join('');
+}
+function exportCSV(){
+  if(!rows.length){showStatus('Ingen rader å eksportere.','err');return;}
+  const lines=['Loggbok for arbeid på eller ved veg','',LABELS.map(l=>`"${l}"`).join(','),...rows.map(r=>FIELDS.map(k=>`"${r[k]||''}"`).join(','))];
+  const blob=new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='loggbok.csv';a.click();
+  URL.revokeObjectURL(url);
+  showStatus('✓ CSV lastet ned!');
+}
+</script>
+</body>
+</html>
