@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVDB Test</title>
+<style>
+body{background:#111;color:#eee;font-family:monospace;padding:20px;font-size:14px;}
+button{background:#f5a623;color:#111;border:none;padding:14px 24px;font-size:16px;cursor:pointer;width:100%;margin-bottom:12px;font-weight:bold;}
+pre{background:#1a1a1a;padding:12px;white-space:pre-wrap;word-break:break-all;border:1px solid #333;margin-top:8px;}
+.ok{color:#7ecf7e;} .err{color:#cf7e7e;} .warn{color:#cfb07e;}
+</style>
+</head>
+<body>
+<h2>NVDB Direkte Test 🔍</h2>
+<p>Trykk knappen utendørs på veien:</p>
+
+<button onclick="testNVDB()">📍 TEST NVDB DIREKTE</button>
+<div id="out"></div>
+
+<script>
+function log(msg, cls=''){
+  document.getElementById('out').innerHTML += `<pre class="${cls}">${msg}</pre>`;
+}
+
+async function testNVDB(){
+  document.getElementById('out').innerHTML = '';
+  log('Henter GPS...');
+
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const {latitude:lat, longitude:lon, accuracy} = pos.coords;
+    log(`GPS OK: ${lat.toFixed(6)}, ${lon.toFixed(6)} ±${Math.round(accuracy)}m`, 'ok');
+
+    const url = `https://nvdbapiv3.atlas.vegvesen.no/veg?lat=${lat}&lon=${lon}&maks_avstand=100`;
+    log(`Kaller: ${url}`);
+
+    try {
+      const res = await fetch(url, {
+        headers: { 'Accept': 'application/json', 'X-Client': 'loggbok-test' }
+      });
+      log(`HTTP Status: ${res.status}`, res.ok ? 'ok' : 'err');
+      log(`CORS headers:\n  Access-Control-Allow-Origin: ${res.headers.get('access-control-allow-origin') || '(ingen)'}`);
+      const text = await res.text();
+      log(`Svar:\n${text.slice(0,500)}`, res.ok ? 'ok' : 'err');
+    } catch(e) {
+      log(`FEIL: ${e.name}: ${e.message}`, 'err');
+      if(e.message.includes('CORS') || e.message.includes('fetch') || e.message.includes('Load failed')){
+        log('→ Dette er en CORS-blokkering fra nettleseren', 'warn');
+      }
+    }
+  }, err => {
+    log(`GPS feil: ${err.message}`, 'err');
+  }, {enableHighAccuracy:true, timeout:15000});
+}
+</script>
+</body>
+</html>
