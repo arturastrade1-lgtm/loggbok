@@ -125,37 +125,31 @@ function showTab(t){
   document.getElementById('btnLog').className='tab'+(t==='log'?' active':'');
 }
 
-function parseKortform(kortform){
-  const parts=kortform.trim().split(/\s+/);
-  const vegnr=parts[0]||'';
-  const sd=parts.find(p=>/^S\d/i.test(p))||'';
-  const mPart=parts.find(p=>/^m\d/i.test(p))||'';
-  const meter=mPart.replace(/^m/i,'');
-  return{vegnr,sd,meter,kortform};
-}
-
-async function nvdbLookup(lat,lon){
-  const nvdbUrls=[
+async function nvdbDirect(lat,lon){
+  // Call NVDB directly from the browser — works from Norwegian mobile networks
+  const urls=[
     `https://nvdbapiv3.atlas.vegvesen.no/veg?lat=${lat}&lon=${lon}&maks_avstand=100`,
     `https://nvdbapiv3.atlas.vegvesen.no/posisjon?lat=${lat}&lon=${lon}&maks_avstand=100`,
   ];
-  // 1. Try direct browser fetch (works if NVDB has CORS headers)
-  for(const url of nvdbUrls){
+  for(const url of urls){
     try{
-      const res=await fetch(url,{headers:{Accept:'application/json','X-Client':'loggbok'}});
+      const res=await fetch(url,{
+        headers:{'Accept':'application/json','X-Client':'loggbok-arbeidsvarsling'}
+      });
       if(!res.ok) continue;
       const data=await res.json();
       const item=Array.isArray(data)?data[0]:data;
       const kortform=item?.vegsystemreferanse?.kortform;
-      if(kortform) return parseKortform(kortform);
-    }catch(e){console.log('Direct NVDB failed:',e.message);}
+      if(!kortform) continue;
+      const parts=kortform.trim().split(/\s+/);
+      return{
+        vegnr: parts[0]||'',
+        sd:    parts.find(p=>/^S\d/i.test(p))||'',
+        meter: (parts.find(p=>/^m\d/i.test(p))||'').replace(/^m/i,''),
+        kortform
+      };
+    }catch(e){ continue; }
   }
-  // 2. Fallback to Vercel proxy
-  try{
-    const res=await fetch(`/api/nvdb?lat=${lat}&lon=${lon}`);
-    const data=await res.json();
-    if(data.vegnr) return data;
-  }catch(e){console.log('Proxy failed:',e.message);}
   return null;
 }
 
@@ -172,8 +166,8 @@ async function registerGPS(){
     const acc=`±${Math.round(accuracy)}m`;
     document.getElementById('gpsSub').textContent=`${lat.toFixed(5)}, ${lon.toFixed(5)}  ${acc}`;
     try{
-      const road=await nvdbLookup(lat,lon);
-      if(road?.vegnr){
+      const road=await nvdbDirect(lat,lon);
+      if(road){
         document.getElementById('f_vegnr').value=road.vegnr;
         document.getElementById('f_sd').value=road.sd;
         document.getElementById('f_meter').value=road.meter;
@@ -188,7 +182,7 @@ async function registerGPS(){
       }else{
         document.getElementById('f_startDato').value=t.dato;
         document.getElementById('f_startKl').value=t.kl;
-        showStatus(`GPS OK (${acc}). Veg ikke funnet. Tid satt. Fyll inn vegnr manuelt.`,'warn');
+        showStatus(`GPS OK (${acc}). Veg ikke funnet. Tid satt.`,'warn');
       }
     }catch(e){
       document.getElementById('f_startDato').value=t.dato;
@@ -228,8 +222,8 @@ function addRow(){
 function removeRow(id){const i=rows.findIndex(r=>r.id===id);if(i>=0)rows.splice(i,1);updateLog();}
 function updateLog(){
   const n=rows.length;
-  const badge=document.getElementById('logCount');
-  badge.style.display=n>0?'inline':'none';badge.textContent=n;
+  document.getElementById('logCount').style.display=n>0?'inline':'none';
+  document.getElementById('logCount').textContent=n;
   document.getElementById('emptyLog').style.display=n===0?'flex':'none';
   document.getElementById('exportBig').style.display=n>0?'block':'none';
   document.getElementById('exportBig').textContent=`↓ Last ned CSV (${n} rad${n!==1?'er':''})`;
@@ -249,9 +243,8 @@ function exportCSV(){
   if(!rows.length){showStatus('Ingen rader å eksportere.','err');return;}
   const lines=['Loggbok for arbeid på eller ved veg','',LABELS.map(l=>`"${l}"`).join(','),...rows.map(r=>FIELDS.map(k=>`"${r[k]||''}"`).join(','))];
   const blob=new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download='loggbok.csv';a.click();
-  URL.revokeObjectURL(url);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='loggbok.csv';a.click();
   showStatus('✓ CSV lastet ned!');
 }
 </script>
